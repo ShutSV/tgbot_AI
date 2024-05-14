@@ -1,5 +1,12 @@
 # tgbot_AI
-telegram bot AI 
+
+A simple Telegram Chatbot using OpenAI GPT models
+---
+
+### One-click to start
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/sNYhKQ?referralCode=IkBkb-)
+
+---
 
 Интерфейс - телеграм бот
 Задача - На базе OpenAI AssistantAPI сделать бота, который общается как нутрициолог
