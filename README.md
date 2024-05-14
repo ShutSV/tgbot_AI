@@ -1,5 +1,9 @@
 # tgbot_AI
-telegram bot AI 
+
+A simple Telegram Chatbot using OpenAI GPT models
+---
+
+---
 
 Интерфейс - телеграм бот
 Задача - На базе OpenAI AssistantAPI сделать бота, который общается как нутрициолог
