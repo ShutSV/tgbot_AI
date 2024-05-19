@@ -1,21 +1,30 @@
-import argparse, json, logging, os, openai, requests
+import argparse
+import json
+import logging
+import os
+import openai
+import requests
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackContext, filters
+
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') or exit("🚨Error: TELEGRAM_TOKEN is not set.")
 openai.api_key = os.getenv('OPENAI_API_KEY') or None
 SESSION_DATA = {}
 
+
 def load_configuration():
     with open('configuration.json', 'r') as file:
         return json.load(file)
+
 
 def get_session_id(func):
     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
         session_id = str(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else update.effective_user.id)
         return await func(update, context, session_id, *args, **kwargs)
     return wrapper
+
 
 def initialize_session_data(func):
     async def wrapper(update: Update, context: CallbackContext, session_id, *args, **kwargs):
@@ -28,6 +37,7 @@ def initialize_session_data(func):
         return await func(update, context, session_id, *args, **kwargs)
     return wrapper
 
+
 def check_api_key(func):
     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
         if not openai.api_key:
@@ -36,6 +46,7 @@ def check_api_key(func):
         return await func(update, context, *args, **kwargs)
     return wrapper
 
+
 def relay_errors(func):
     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
         try:
@@ -43,6 +54,7 @@ def relay_errors(func):
         except Exception as e:
             await update.message.reply_text(f"An error occurred. e: {e}")
     return wrapper
+
 
 @relay_errors
 @get_session_id
@@ -82,6 +94,7 @@ async def handle_message(update: Update, context: CallbackContext, session_id):
     })
     await update.message.reply_markdown(response)
 
+
 async def response_from_openai(model, messages, temperature, max_tokens):
     params = {'model': model, 'messages': messages, 'temperature': temperature}
     if model == "gpt-4-vision-preview": 
@@ -90,8 +103,10 @@ async def response_from_openai(model, messages, temperature, max_tokens):
         params['max_tokens'] = max_tokens
     return openai.chat.completions.create(**params).choices[0].message.content
 
+
 async def command_start(update: Update, context: CallbackContext):
     await update.message.reply_text("ℹ️Welcome! Go ahead and say something to start the conversation. More features can be found in this command: /help")
+
 
 @get_session_id
 async def command_reset(update: Update, context: CallbackContext, session_id):
@@ -99,6 +114,7 @@ async def command_reset(update: Update, context: CallbackContext, session_id):
         del SESSION_DATA[session_id]
         await update.message.reply_text("ℹ️All settings have been reset.")
     await update.message.reply_text("ℹ️No session data to reset.") 
+
 
 @get_session_id
 async def command_clear(update: Update, context: CallbackContext, session_id):
@@ -108,12 +124,14 @@ async def command_clear(update: Update, context: CallbackContext, session_id):
     else:
         logging.warning(f"No session data found for session_id={session_id}")
 
+
 def update_session_preference(session_id, preference, value):
     if session_id in SESSION_DATA:
         SESSION_DATA[session_id][preference] = value
         logging.debug(f"Updated {preference} for session_id={session_id}: {value}")
     else:
         logging.warning(f"Tried to update preference for non-existing session_id={session_id}")
+
 
 @get_session_id
 @initialize_session_data
@@ -165,6 +183,7 @@ async def command_set(update: Update, context: CallbackContext, session_id):
     else:
         await update.message.reply_text("⚠️Invalid setting or value.")
 
+
 @get_session_id
 async def command_show(update: Update, context: CallbackContext, session_id):
     session_data = SESSION_DATA.get(session_id, {})
@@ -195,6 +214,7 @@ async def command_show(update: Update, context: CallbackContext, session_id):
     for chunk in message_chunks:
         await update.message.reply_text(chunk)
 
+
 async def command_help(update: Update, context: CallbackContext):
     commands = [
         ("/reset", "Reset settings"),
@@ -207,6 +227,7 @@ async def command_help(update: Update, context: CallbackContext):
     for command, description in commands:
         help_text += f"<code>{command}</code> - {description}\n"
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
+
 
 def register_handlers(application):
     application.add_handlers(handlers={ 
@@ -221,6 +242,7 @@ def register_handlers(application):
         1: [MessageHandler(filters.ALL & (~filters.COMMAND), handle_message)]
     })
 
+
 def railway_dns_workaround():
     from time import sleep
     sleep(1.3)
@@ -230,6 +252,7 @@ def railway_dns_workaround():
             return
         print(f'The api.telegram.org is not reachable. Retrying...({_})')
     print("Failed to reach api.telegram.org after 3 attempts.")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run the Telegram bot.")
@@ -247,6 +270,7 @@ def main():
         application.run_polling()
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+
 
 if __name__ == '__main__':
     main()
