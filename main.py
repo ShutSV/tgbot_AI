@@ -80,7 +80,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Что на этой картинке? Какого цвета глаза?"},
+                    {"type": "text", "text": "Что на этой картинке, и какого цвета глаза?"},
                     {
                         "type": "image_url",
                         "image_url": {
