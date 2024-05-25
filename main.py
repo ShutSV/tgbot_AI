@@ -1,9 +1,6 @@
-# import asyncio
 import base64
 import openai
 import os
-# from pydub import AudioSegment
-# import io
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -26,7 +23,7 @@ def text_generate(msg):
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text('Привет! Отправьте мне текстовое сообщение, голосовое сообщение или изображение.')
+    await update.message.reply_text('Привет! Это эксперимент Сергея. Отправьте текстовое сообщение, голосовое сообщение или изображение.')
 
 
 # Обработчик текстовых сообщений
@@ -83,7 +80,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Что на этой картинке?"},
+                    {"type": "text", "text": "Что на этой картинке? Какого цвета глаза?"},
                     {
                         "type": "image_url",
                         "image_url": {
