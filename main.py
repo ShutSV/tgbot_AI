@@ -2,8 +2,8 @@
 import base64
 import openai
 import os
-from pydub import AudioSegment
-import io
+# from pydub import AudioSegment
+# import io
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -44,13 +44,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     voice = await audio_file.download_as_bytearray()
     with open('output.ogg', "wb") as f:
         f.write(voice)
+    audio_file = open("output.ogg", "rb")
 
-    # Конвертация OGG в MP3
-    audio_segment = AudioSegment.from_ogg(io.BytesIO(voice))
-    audio_segment.export("output.mp3", format="mp3")
-
-    # transform mp3 to text
-    audio_file = open("output.mp3", "rb")
     transcription = client.audio.transcriptions.create(
         model="whisper-1",
         file=audio_file
