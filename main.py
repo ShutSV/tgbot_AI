@@ -139,7 +139,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
 
 
 # Обработчик изображений
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@get_session_id
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
 
     # Получение файла изображений
     photo = update.message.photo[-1]
@@ -171,6 +172,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # response to user text
     reply_text = response.choices[0].message.content
     await update.message.reply_text(f"{reply_text}")
+
+    # Добавление сообщения в историю
+    save_message(user_id, session_id, reply_text)
 
     # Голосовой ответ
     # response = client.audio.speech.create(
