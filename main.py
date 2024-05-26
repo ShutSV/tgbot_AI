@@ -80,7 +80,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: 
 def text_generate(msg):
     messages = [
         {"role": "system", "content": "You are a useful nutritiotist."},
-        {"role": "user", "content": msg + " Ответь на белорусском языке"},
+        {"role": "user", "content": msg + [" Ответь на белорусском языке"]},
     ]
     return client.chat.completions.create(
         model="gpt-4o",
