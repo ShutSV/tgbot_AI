@@ -12,7 +12,7 @@ client = openai.OpenAI()
 
 def text_generate(msg):
     messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": "You are a useful assistant, you answer in Belarusian."},
         {"role": "user", "content": msg},
     ]
     return client.chat.completions.create(
