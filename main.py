@@ -12,7 +12,7 @@ client = openai.OpenAI()
 
 def text_generate(msg):
     messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": "Ты помощник, отвечаешь на русском языке и повторяешь на белорусском."},
         {"role": "user", "content": msg},
     ]
     return client.chat.completions.create(
@@ -23,7 +23,7 @@ def text_generate(msg):
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text('Привет! Это эксперимент Сергея. Отправьте текстовое сообщение, голосовое сообщение или изображение.')
+    await update.message.reply_text('Привет! Это эксперимент. Отправьте текстовое сообщение, голосовое сообщение или изображение.')
 
 
 # Обработчик текстовых сообщений
@@ -80,7 +80,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Что на этой картинке, и какого цвета глаза?"},
+                    {"type": "text", "text": "Что на этой картинке, и какой формы уши?"},
                     {
                         "type": "image_url",
                         "image_url": {
