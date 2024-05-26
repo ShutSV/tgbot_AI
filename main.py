@@ -28,9 +28,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Обработчик текстовых сообщений
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_first_name = update.effective_user.first_name
     response = text_generate(update.message.text)
     reply_text = response.choices[0].message.content
-    await update.message.reply_text(f"{reply_text}")
+    await update.message.reply_text(f"{user_first_name}, {reply_text}")
 
 
 # # Обработчик голосовых сообщений
