@@ -50,13 +50,14 @@ def get_message_history(chat_id, limit=10):
     conn = sqlite3.connect('messages.db')
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT ?',
+        'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp LIMIT ?',
+        # 'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT ?',
         (chat_id, limit)
     )
     rows = cursor.fetchall()
     conn.close()
     return ([{"role": "system", "content": "You are a useful nutritiotist."}] +
-            [{"role": "user", "content": row[0]} for row in rows])
+            [{"role": "user", "content": row[0]} for row in rows[1:]])
 
 
 def get_session_id(func):
@@ -80,6 +81,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: 
 
 def text_generate(msg):
     messages = msg + [{"role": "user", "content": "Ответь на белорусском"}]
+    print("*" * 50)
+    print(f"{messages=}")
+    print("*" * 50)
     return client.chat.completions.create(
         model="gpt-4o",
         messages=messages
