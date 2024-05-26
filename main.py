@@ -12,7 +12,7 @@ client = openai.OpenAI()
 
 def text_generate(msg):
     messages = [
-        {"role": "system", "content": "Ты помощник, отвечаешь на русском языке и повторяешь на белорусском."},
+        {"role": "system", "content": "Ты помощник, отвечаешь на белорусском языке."},
         {"role": "user", "content": msg},
     ]
     return client.chat.completions.create(
@@ -80,7 +80,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Что на этой картинке, и какой формы уши?"},
+                    {"type": "text", "text": "Что на этой картинке, и есть ли уши?"},
                     {
                         "type": "image_url",
                         "image_url": {
