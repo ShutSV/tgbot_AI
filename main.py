@@ -73,7 +73,7 @@ def get_session_id(func):
 
 # Обработчик команды /start
 @get_session_id
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, full_name:str) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
     await update.message.reply_text(f'{full_name}, отправьте текст, голос, или изображение.')
 
 
@@ -90,7 +90,7 @@ def text_generate(msg):
 
 # Обработчик текстовых сообщений
 @get_session_id
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, full_name:str) -> None:
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
     history = get_message_history(session_id)
     response = text_generate(history)
     reply_text = response.choices[0].message.content
