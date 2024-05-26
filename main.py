@@ -51,12 +51,11 @@ def get_message_history(chat_id, limit=10):
     cursor = conn.cursor()
     cursor.execute(
         'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp LIMIT ?',
-        # 'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT ?',
         (chat_id, limit)
     )
     rows = cursor.fetchall()
     conn.close()
-    return ([{"role": "system", "content": "You are a useful nutritiotist."}] +
+    return ([{"role": "system", "content": "You are a useful nutritiotist. Ask questions about the user that will help give him advice on proper nutrition"}] +
             [{"role": "user", "content": row[0]} for row in rows[1:]])
 
 
@@ -76,26 +75,22 @@ def get_session_id(func):
 # Обработчик команды /start
 @get_session_id
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
-    await update.message.reply_text(f'{full_name}, отправьте текст, голос, или изображение.')
+    await update.message.reply_text(f'Здравствуйте, {full_name}. Я - Ваш советник по диетологии. Отправьте текст, голос, или изображение.')
 
 
 def text_generate(msg):
     messages = msg + [{"role": "user", "content": "Ответь на белорусском"}]
-    print("*" * 50)
-    print(f"{messages=}")
-    print("*" * 50)
-    return client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages
-    )
+    return client.chat.completions.create(model="gpt-4o", messages=messages)
 
 
 # Обработчик текстовых сообщений
 @get_session_id
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
     history = get_message_history(session_id)
+
     response = text_generate(history)
     reply_text = response.choices[0].message.content
+
     await update.message.reply_text(f"{full_name}, {reply_text}")
 
 
@@ -110,23 +105,24 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
         f.write(voice)
     audio_file = open("output.ogg", "rb")
 
+    # Преобразование голосового запроса в текст
     transcription = client.audio.transcriptions.create(
         model="whisper-1",
         file=audio_file
     )
 
-    await update.message.reply_text(f"""{full_name}: "{transcription.text}""""")
+    # Вывод текста запроса
+    # await update.message.reply_text(f"""{full_name}: "{transcription.text}""""")
 
     # Добавление сообщения в историю
     save_message(user_id, session_id, transcription.text)
 
     # Генерация ответа
     history = get_message_history(session_id)
-    response = text_generate(history)
-    reply_text = response.choices[0].message.content
+    reply_text = text_generate(history).choices[0].message.content
 
     # Отправка текстового ответа
-    await update.message.reply_text(f"{full_name}, {reply_text}")
+    # await update.message.reply_text(f"{full_name}, {reply_text}")
 
     # transform reply_text to file mp3
     response = client.audio.speech.create(
@@ -134,6 +130,8 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
         voice="onyx",
         input=reply_text
     )
+
+    # Сохранение голосового ответа в файл
     response.stream_to_file("speech.mp3")
 
     # Отправка голосового ответа
@@ -142,10 +140,13 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
 
 # Обработчик изображений
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+    # Получение файла изображений
     photo = update.message.photo[-1]
     file = await photo.get_file()
     await file.download_to_drive("image.jpg")
 
+    # Передача файла изображения в модель для распознавания
     with open("image.jpg", "rb") as f:
         base64_image = base64.b64encode(f.read()).decode("utf-8")
     response = client.chat.completions.create(
@@ -154,7 +155,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Что на этой картинке, сколько примерно весит каждый человек, какой он комплекции, и ответь на белорусском языке?"},
+                    {"type": "text", "text": "Есть ли съедобные предметы, сколько в них белков, жиров, углеводов и калорий, и ответь на белорусском языке?"},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -167,21 +168,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         max_tokens=300,
     )
 
-    # response to user
-    print("ответ AI:", response.choices[0].message.content)
+    # response to user text
     reply_text = response.choices[0].message.content
-    await update.message.reply_text(f"AI: {reply_text}")
+    await update.message.reply_text(f"{reply_text}")
 
-    # transform reply_text to file mp3
-    response = client.audio.speech.create(
-        model="tts-1-hd",
-        voice="onyx",
-        input=reply_text
-    )
-    response.stream_to_file("speech.mp3")
-
-    # Отправляем голосовой ответ
-    await update.message.reply_voice(voice=open("speech.mp3", 'rb'))
+    # Голосовой ответ
+    # response = client.audio.speech.create(
+    #     model="tts-1-hd",
+    #     voice="onyx",
+    #     input=reply_text
+    # )
+    # response.stream_to_file("speech.mp3")
+    # await update.message.reply_voice(voice=open("speech.mp3", 'rb'))
 
 
 def main():
