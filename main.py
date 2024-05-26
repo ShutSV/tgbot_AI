@@ -2,7 +2,16 @@ import base64
 import openai
 import os
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CallbackContext,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters
+)
+import sqlite3
+from datetime import datetime
 
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') or exit("🚨Error: TELEGRAM_TOKEN is not set.")
@@ -10,10 +19,67 @@ openai.api_key = os.getenv('OPENAI_API_KEY') or None
 client = openai.OpenAI()
 
 
+def create_database():
+    conn = sqlite3.connect('messages.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        '''CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        user_id TEXT, 
+        chat_id TEXT, 
+        message TEXT, 
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)'''
+    )
+    conn.commit()
+    conn.close()
+
+
+def save_message(user_id, chat_id, message):
+    conn = sqlite3.connect('messages.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO messages (user_id, chat_id, message) VALUES (?, ?, ?)',
+        (user_id, chat_id, message)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_message_history(chat_id, limit=10):
+    conn = sqlite3.connect('messages.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT ?',
+        (chat_id, limit)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
+
+
+def get_session_id(func):
+    async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+        session_id = str(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else update.effective_user.id)
+        user_id = str(update.effective_user.id)
+        message = update.message.text
+        save_message(user_id, session_id, message)
+        user_first_name = update.effective_user.first_name
+        user_last_name = update.effective_user.last_name
+        full_name = f"{user_first_name} {user_last_name}" if user_last_name else user_first_name
+        return await func(update, context, session_id, user_id, full_name, *args, **kwargs)
+    return wrapper
+
+
+# Обработчик команды /start
+@get_session_id
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, full_name:str) -> None:
+    await update.message.reply_text(f'{full_name}, отправьте текст, голос, или изображение.')
+
+
 def text_generate(msg):
     messages = [
-        {"role": "system", "content": "You are a useful assistant - nutritiotist."},
-        {"role": "user", "content": msg + "Ответь на белорусском языке"},
+        {"role": "system", "content": "You are a useful nutritiotist."},
+        {"role": "user", "content": msg + " Ответь на белорусском языке"},
     ]
     return client.chat.completions.create(
         model="gpt-4o",
@@ -21,22 +87,18 @@ def text_generate(msg):
     )
 
 
-# Обработчик команды /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_first_name = update.effective_user.first_name
-    await update.message.reply_text(f'{user_first_name}, отправьте текст, голос, или изображение.')
-
-
 # Обработчик текстовых сообщений
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_first_name = update.effective_user.first_name
-    response = text_generate(update.message.text)
+@get_session_id
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, full_name:str) -> None:
+    history = get_message_history(session_id)
+    response = text_generate(history)
     reply_text = response.choices[0].message.content
-    await update.message.reply_text(f"{user_first_name}, {reply_text}")
+    await update.message.reply_text(f"{full_name}, {reply_text}")
 
 
 # # Обработчик голосовых сообщений
-async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@get_session_id
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
 
     # Получение файла голосового сообщения
     audio_file = await update.message.voice.get_file()
@@ -50,11 +112,18 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         file=audio_file
     )
 
-    await update.message.reply_text(f"""user: "{transcription.text}""""")
+    await update.message.reply_text(f"""{full_name}: "{transcription.text}""""")
 
-    response = text_generate(transcription.text)
+    # Добавление сообщения в историю
+    save_message(user_id, session_id, transcription.text)
+
+    # Генерация ответа
+    history = get_message_history(session_id)
+    response = text_generate(history)
     reply_text = response.choices[0].message.content
-    await update.message.reply_text(f"{reply_text}")
+
+    # Отправка текстового ответа
+    await update.message.reply_text(f"{full_name}, {reply_text}")
 
     # transform reply_text to file mp3
     response = client.audio.speech.create(
@@ -64,7 +133,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
     response.stream_to_file("speech.mp3")
 
-    # Отправляем голосовой ответ
+    # Отправка голосового ответа
     await update.message.reply_voice(voice=open("speech.mp3", 'rb'))
 
 
@@ -133,5 +202,6 @@ def main():
 
 
 if __name__ == "__main__":
+    create_database()
 
     main()
