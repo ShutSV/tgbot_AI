@@ -12,8 +12,8 @@ client = openai.OpenAI()
 
 def text_generate(msg):
     messages = [
-        {"role": "system", "content": "You are a useful assistant, you duplicate answers in Belarusian."},
-        {"role": "user", "content": msg},
+        {"role": "system", "content": "You are a useful assistant."},
+        {"role": "user", "content": msg + "Ответь на белорусском языке"},
     ]
     return client.chat.completions.create(
         model="gpt-4o",
