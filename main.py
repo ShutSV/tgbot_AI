@@ -55,7 +55,8 @@ def get_message_history(chat_id, limit=10):
     )
     rows = cursor.fetchall()
     conn.close()
-    return [row[0] for row in rows]
+    return ([{"role": "system", "content": "You are a useful nutritiotist."}] +
+            [{"role": "user", "content": row[0]} for row in rows])
 
 
 def get_session_id(func):
@@ -78,10 +79,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: 
 
 
 def text_generate(msg):
-    messages = [
-        {"role": "system", "content": "You are a useful nutritiotist."},
-        {"role": "user", "content": msg + [" Ответь на белорусском языке"]},
-    ]
+    messages = msg + [{"role": "user", "content": "Ответь на белорусском"}]
     return client.chat.completions.create(
         model="gpt-4o",
         messages=messages
