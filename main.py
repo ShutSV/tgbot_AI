@@ -115,6 +115,10 @@ def main():
     application = (
         ApplicationBuilder()
         .token(TELEGRAM_TOKEN)
+        .connect_timeout(30)  # Увеличение времени ожидания подключения
+        .read_timeout(30)  # Увеличение времени ожидания чтения ответа
+        .write_timeout(30)  # Увеличение времени ожидания записи запроса
+        .pool_timeout(10)  # Увеличение времени ожидания получения соединения из пула
         .build()
     )
 
@@ -123,12 +127,7 @@ def main():
     application.add_handler(MessageHandler(filters.VOICE, handle_voice))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    application.run_polling(
-        timeout=30,  # Увеличение времени ожидания
-        read_timeout=30,  # Увеличение времени ожидания чтения ответа
-        write_timeout=30,  # Увеличение времени ожидания записи запроса
-        connect_timeout=30  # Увеличение времени ожидания подключения
-    )
+    application.run_polling()
 
 
 if __name__ == "__main__":
