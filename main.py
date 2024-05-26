@@ -23,7 +23,8 @@ def text_generate(msg):
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text('Отправьте текст, голос, или изображение.')
+    user_first_name = update.effective_user.first_name
+    await update.message.reply_text(f'{user_first_name}, отправьте текст, голос, или изображение.')
 
 
 # Обработчик текстовых сообщений
