@@ -26,14 +26,13 @@ def get_db_connection():
     connection = None
     try:
         connection = connect(DATABASE_URL)
-        print("\nСоединение с БД установлено", connection, "\n")
+        # print("\nСоединение с БД установлено", connection, "\n")
         yield connection
     except OperationalError as e:
         print('БД не доступна', e)
     finally:
         if connection:
             connection.close()
-            print("Соединение с БД закрыто")
 
 
 @contextmanager
@@ -97,11 +96,6 @@ def get_message_history(chat_id, limit=4096):
                  Задавай по одному вопросу. Отвечай на белорусском."
                  }] +
             [{"role": row[0], "content": row[1]} for row in rows[1:]])
-    print("*" * 50)
-    for i in history:
-        print(f"{i=}")
-    # print(f"{history=}")
-    print("*" * 50)
     return history
 
 
@@ -128,7 +122,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: 
 
 
 def text_generate(msg):
-    # messages = msg + [{"role": "user", "content": "Ответь на белорусском"}]
     response = client.chat.completions.create(model="gpt-4o", messages=msg)
     return response
 
@@ -137,8 +130,7 @@ def text_generate(msg):
 @get_session_id
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name: str) -> None:
     history = get_message_history(session_id)
-    response = text_generate(history)
-    reply_text = response.choices[0].message.content
+    reply_text = text_generate(history).choices[0].message.content
     role_user = "assistant"
     save_message(user_id, session_id, role_user, reply_text)
     await update.message.reply_text(f"{full_name}, {reply_text}")
@@ -161,9 +153,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
         file=audio_file
     )
 
-    # Вывод текста запроса
-    # await update.message.reply_text(f"""{full_name}: "{transcription.text}""""")
-
     # Добавление сообщения в историю
     user_role = "user"
     save_message(user_id, session_id, user_role, transcription.text)
@@ -175,9 +164,6 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
     # Добавление ответа  в историю
     user_role = "assistant"
     save_message(user_id, session_id, user_role, reply_text)
-
-    # Отправка текстового ответа
-    # await update.message.reply_text(f"{full_name}, {reply_text}")
 
     # transform reply_text to file mp3
     response = client.audio.speech.create(
@@ -232,15 +218,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
     # Добавление сообщения в историю
     user_role = "user"
     save_message(user_id, session_id, user_role, reply_text)
-
-    # Голосовой ответ
-    # response = client.audio.speech.create(
-    #     model="tts-1-hd",
-    #     voice="onyx",
-    #     input=reply_text
-    # )
-    # response.stream_to_file("speech.mp3")
-    # await update.message.reply_voice(voice=open("speech.mp3", 'rb'))
 
 
 def main():
