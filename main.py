@@ -11,60 +11,108 @@ from telegram.ext import (
     filters
 )
 
-import sqlite3
-from datetime import datetime
+from contextlib import contextmanager
+from psycopg2 import connect, OperationalError
 
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') or exit("🚨Error: TELEGRAM_TOKEN is not set.")
 openai.api_key = os.getenv('OPENAI_API_KEY') or None
+DATABASE_URL = os.getenv('DATABASE_PRIVATE_URL') or exit("🚨Error: DB_URL is not set.")
 client = openai.OpenAI()
 
 
+@contextmanager
+def get_db_connection():
+    connection = None
+    try:
+        connection = connect(DATABASE_URL)
+        print("\nСоединение с БД установлено", connection, "\n")
+        yield connection
+    except OperationalError as e:
+        print('БД не доступна', e)
+    finally:
+        if connection:
+            connection.close()
+            print("Соединение с БД закрыто")
+
+
+@contextmanager
+def get_db_cursor(connection):
+    cursor = None
+    try:
+        cursor = connection.cursor()
+        yield cursor
+    except Exception as e:
+        print("Ошибка при выполнении запроса:", e)
+    finally:
+        if cursor:
+            cursor.close()
+
 def create_database():
-    conn = sqlite3.connect('messages.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        '''CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        user_id TEXT, 
-        chat_id TEXT, 
-        message TEXT, 
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)'''
-    )
-    conn.commit()
-    conn.close()
+
+    with get_db_connection() as connection:
+        if connection:
+            with get_db_cursor(connection) as cursor:
+                if cursor:
+                    cursor.execute(
+                '''CREATE TABLE IF NOT EXISTS messages (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        chat_id INTEGER NOT NULL,
+                        role_user VARCHAR(50) NOT NULL,
+                        message TEXT NOT NULL,
+                        date_message TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'''
+            )
+            connection.commit()
 
 
-def save_message(user_id, chat_id, message):
-    conn = sqlite3.connect('messages.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        'INSERT INTO messages (user_id, chat_id, message) VALUES (?, ?, ?)',
-        (user_id, chat_id, message)
-    )
-    conn.commit()
-    conn.close()
+def save_message(user_id, chat_id, role_user, message):
+
+    with get_db_connection() as connection:
+        if connection:
+            with get_db_cursor(connection) as cursor:
+                if cursor:
+                    cursor.execute(
+                        'INSERT INTO messages (user_id, chat_id, role_user, message) VALUES (%s, %s, %s, %s)',
+                        (user_id, chat_id, role_user, message)
+            )
+            connection.commit()
 
 
-def get_message_history(chat_id, limit=10):
-    conn = sqlite3.connect('messages.db')
-    cursor = conn.cursor()
-    cursor.execute(
-        'SELECT message FROM messages WHERE chat_id = ? ORDER BY timestamp LIMIT ?',
-        (chat_id, limit)
-    )
-    rows = cursor.fetchall()
-    conn.close()
-    return ([{"role": "system", "content": "You are a useful nutritiotist. Ask questions about the user that will help give him advice on proper nutrition"}] +
-            [{"role": "user", "content": row[0]} for row in rows[1:]])
+def get_message_history(chat_id, limit=4096):
+
+    with get_db_connection() as connection:
+        if connection:
+            with get_db_cursor(connection) as cursor:
+                if cursor:
+                    cursor.execute(
+                        'SELECT role_user, message FROM messages WHERE chat_id = %s ORDER BY date_message LIMIT %s',
+                        (chat_id, limit)
+                    )
+                    rows = cursor.fetchall()
+
+    history = ([{"role": "system",
+                 "content": "Ты исполняешь роль диетолога. \
+                 Я бы хотел, чтобы ты задавал мне вопросы для более точных рекомендаций по правильному питанию. \
+                 Задавай по одному вопросу. Отвечай на белорусском."
+                 }] +
+            [{"role": row[0], "content": row[1]} for row in rows[1:]])
+    print("*" * 50)
+    for i in history:
+        print(f"{i=}")
+    # print(f"{history=}")
+    print("*" * 50)
+    return history
 
 
 def get_session_id(func):
     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
         session_id = str(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else update.effective_user.id)
         user_id = str(update.effective_user.id)
+        role_user = "user"
         message = update.message.text
-        save_message(user_id, session_id, message)
+        save_message(user_id, session_id, role_user, message)
+
         user_first_name = update.effective_user.first_name
         user_last_name = update.effective_user.last_name
         full_name = f"{user_first_name} {user_last_name}" if user_last_name else user_first_name
@@ -74,29 +122,31 @@ def get_session_id(func):
 
 # Обработчик команды /start
 @get_session_id
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
-    await update.message.reply_text(f'Здравствуйте, {full_name}. Я - Ваш советник по диетологии. Отправьте текст, голос, или изображение.')
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name: str) -> None:
+    await update.message.reply_text(f'Прывiтанне, {full_name}. \
+    Я - Ваш саветнік па дыеталогіі. Адпраўце тэкст, голас, або малюнак.')
 
 
 def text_generate(msg):
-    messages = msg + [{"role": "user", "content": "Ответь на белорусском"}]
-    return client.chat.completions.create(model="gpt-4o", messages=messages)
+    # messages = msg + [{"role": "user", "content": "Ответь на белорусском"}]
+    response = client.chat.completions.create(model="gpt-4o", messages=msg)
+    return response
 
 
 # Обработчик текстовых сообщений
 @get_session_id
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name: str) -> None:
     history = get_message_history(session_id)
-
     response = text_generate(history)
     reply_text = response.choices[0].message.content
-
+    role_user = "assistant"
+    save_message(user_id, session_id, role_user, reply_text)
     await update.message.reply_text(f"{full_name}, {reply_text}")
 
 
 # # Обработчик голосовых сообщений
 @get_session_id
-async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name: str) -> None:
 
     # Получение файла голосового сообщения
     audio_file = await update.message.voice.get_file()
@@ -115,11 +165,16 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
     # await update.message.reply_text(f"""{full_name}: "{transcription.text}""""")
 
     # Добавление сообщения в историю
-    save_message(user_id, session_id, transcription.text)
+    user_role = "user"
+    save_message(user_id, session_id, user_role, transcription.text)
 
     # Генерация ответа
     history = get_message_history(session_id)
     reply_text = text_generate(history).choices[0].message.content
+
+    # Добавление ответа  в историю
+    user_role = "assistant"
+    save_message(user_id, session_id, user_role, reply_text)
 
     # Отправка текстового ответа
     # await update.message.reply_text(f"{full_name}, {reply_text}")
@@ -140,7 +195,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
 
 # Обработчик изображений
 @get_session_id
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name:str) -> None:
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name: str) -> None:
 
     # Получение файла изображений
     photo = update.message.photo[-1]
@@ -156,7 +211,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Есть ли съедобные предметы, сколько в них белков, жиров, углеводов и калорий, и ответь на белорусском языке?"},
+                    {"type": "text", "text": "Есть ли съедобные предметы, \
+                    сколько в них белков, жиров, углеводов и калорий?"},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -174,7 +230,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
     await update.message.reply_text(f"{reply_text}")
 
     # Добавление сообщения в историю
-    save_message(user_id, session_id, reply_text)
+    user_role = "user"
+    save_message(user_id, session_id, user_role, reply_text)
 
     # Голосовой ответ
     # response = client.audio.speech.create(
