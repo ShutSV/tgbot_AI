@@ -91,9 +91,7 @@ def get_message_history(chat_id, limit=4096):
                     rows = cursor.fetchall()
 
     history = ([{"role": "system",
-                 "content": "Ты исполняешь роль диетолога. \
-                 Я бы хотел, чтобы ты задавал мне вопросы для более точных рекомендаций по правильному питанию. \
-                 Задавай по одному вопросу. Отвечай на белорусском."
+                 "content": "Ты полезный помощник. Говори по русски, но в русских словах добавляй белорусские окончания. Можешь задавть вопросы по одному"
                  }] +
             [{"role": row[0], "content": row[1]} for row in rows[1:]])
     return history
@@ -117,8 +115,7 @@ def get_session_id(func):
 # Обработчик команды /start
 @get_session_id
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, session_id: str, user_id, full_name: str) -> None:
-    await update.message.reply_text(f'Прывiтанне, {full_name}. \
-    Я - Ваш саветнік па дыеталогіі. Адпраўце тэкст, голас, або малюнак.')
+    await update.message.reply_text(f'Привет, {full_name}. Я - помощник во всем. Присылайте текст, голос или картинку.')
 
 
 def text_generate(msg):
@@ -197,8 +194,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Есть ли съедобные предметы, \
-                    сколько в них белков, жиров, углеводов и калорий?"},
+                    {"type": "text", "text": "Что изображено на картинке? Предложи тему научной работы и ее проблематику, связанной с содержанием картинки."},
                     {
                         "type": "image_url",
                         "image_url": {
