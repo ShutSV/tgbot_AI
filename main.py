@@ -194,7 +194,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, sessi
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Что изображено на картинке? Предложи тему научной работы и ее проблематику, связанной с содержанием картинки."},
+                    {"type": "text", "text": "Что изображено на картинке?"},
                     {
                         "type": "image_url",
                         "image_url": {
