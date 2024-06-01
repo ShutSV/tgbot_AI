@@ -8,7 +8,7 @@ A simple Telegram Chatbot using OpenAI GPT models
 Для конфигурации используется PydanticSettings, все секреты записаны в .env файл; файл .env включен в gitignore.
 Используется OpenAI Assistant API (не Completions API) для получения ответов на вопросы. Все запросы идут через асинхронный клиент OpenAI в их SDK
 
-Подключена база данных PostgreSQL для хранения запросов и ответов бота. Для работы с БД используется SQLAlchemy ORM
+Подключена база данных PostgreSQL для хранения запросов и ответов бота. Для работы с БД используется асинхронная версия SQLAlchemy ORM
 Бот и БД размещены на Railway.app
 
 Используются модели:
