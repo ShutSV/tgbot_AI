@@ -25,20 +25,6 @@ async def generate_text(prompt) -> str:
 
 router = Router()
 
-# def get_session_info(func):
-#     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
-#         session_id = str(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else update.effective_user.id)
-#         user_id = str(update.effective_user.id)
-#         role_user = "user"
-#         message = update.message.text
-#         save_message(user_id, session_id, role_user, message)
-#
-#         user_first_name = update.effective_user.first_name
-#         user_last_name = update.effective_user.last_name
-#         full_name = f"{user_first_name} {user_last_name}" if user_last_name else user_first_name
-#         return await func(update, context, session_id, user_id, full_name, *args, **kwargs)
-#     return wrapper
-
 
 def extract_info(handler):
     @wraps(handler)
@@ -52,7 +38,6 @@ def extract_info(handler):
                      "content": "Ты полезный помощник. Можешь задавать вопросы по одному"
                      }] +
                    [{"role": row.role_user, "content": row.message} for row in rows])
-        print("*" * 20, history, "*" * 20)
         return await handler(message, chat_id=chat_id, user_id=user_id, full_name=full_name, text=text, history=history, *args, **kwargs)
     return wrapper
 
@@ -66,7 +51,6 @@ async def start_handler(msg: Message):
 @extract_info
 async def message_handler(msg: Message, chat_id: int, user_id: int, full_name: str, text: str, history: str):
     prompt = history + [{"role": "user", "content": text}] if history else [{"role": "user", "content": text}]
-    print("промт", "*" * 20, prompt, "*" * 20)
     reply_text = await generate_text(prompt)
     await msg.answer(f"{full_name}, {reply_text}")
     await MessagesRepository.add({
