@@ -1,40 +1,23 @@
 import asyncio
 import logging
+from openai import AsyncOpenAI
+from functools import wraps
 
 from aiogram import Bot, Dispatcher, Router, types, F
-from aiogram.enums.parse_mode import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, FSInputFile
 from aiogram.filters import Command
 
-from openai import AsyncOpenAI
+from settings import settings
+from database import MessagesRepository, create_table
 
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
-
-
-load_dotenv()
-
-
-class Settings(BaseSettings):
-    TELEGRAM_TOKEN: str
-    OPENAI_API_KEY: str
-    INPUT_VOICE: str
-    OUTPUT_VOICE: str
-
-
-settings = Settings()
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY,)
 
 
 async def generate_text(prompt) -> str:
     try:
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-        response = await client.chat.completions.create(model="gpt-4o", messages=messages)
+        response = await client.chat.completions.create(model="gpt-4o", messages=prompt)
         return response.choices[0].message.content
     except Exception as e:
         logging.error(e)
@@ -42,20 +25,67 @@ async def generate_text(prompt) -> str:
 
 router = Router()
 
+# def get_session_info(func):
+#     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+#         session_id = str(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else update.effective_user.id)
+#         user_id = str(update.effective_user.id)
+#         role_user = "user"
+#         message = update.message.text
+#         save_message(user_id, session_id, role_user, message)
+#
+#         user_first_name = update.effective_user.first_name
+#         user_last_name = update.effective_user.last_name
+#         full_name = f"{user_first_name} {user_last_name}" if user_last_name else user_first_name
+#         return await func(update, context, session_id, user_id, full_name, *args, **kwargs)
+#     return wrapper
+
+
+def extract_info(handler):
+    @wraps(handler)
+    async def wrapper(message: types.Message, *args, **kwargs):
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        full_name = message.from_user.full_name
+        text = message.text
+        rows = await MessagesRepository.filter(user_id=user_id)
+        history = ([{"role": "system",
+                     "content": "Ты полезный помощник. Можешь задавать вопросы по одному"
+                     }] +
+                   [{"role": row.role_user, "content": row.message} for row in rows])
+        print("*" * 20, history, "*" * 20)
+        return await handler(message, chat_id=chat_id, user_id=user_id, full_name=full_name, text=text, history=history, *args, **kwargs)
+    return wrapper
+
 
 @router.message(Command("start"))
 async def start_handler(msg: Message):
-    await msg.answer("Привет! Отправь мне любое сообщение")
+    await msg.answer("Привет! Отправь мне текст или голосовое сообщение, и я отвечу на него.")
 
 
 @router.message(F.content_type == types.ContentType.TEXT)
-async def message_handler(msg: Message):
-    reply_text = await generate_text(msg.text)
-    await msg.answer(f"Ответ AI: {reply_text}")
+@extract_info
+async def message_handler(msg: Message, chat_id: int, user_id: int, full_name: str, text: str, history: str):
+    prompt = history + [{"role": "user", "content": text}] if history else [{"role": "user", "content": text}]
+    print("промт", "*" * 20, prompt, "*" * 20)
+    reply_text = await generate_text(prompt)
+    await msg.answer(f"{full_name}, {reply_text}")
+    await MessagesRepository.add({
+        "chat_id": chat_id,
+        "user_id": user_id,
+        "role_user": "user",
+        "message": text
+    })
+    await MessagesRepository.add({
+        "chat_id": chat_id,
+        "user_id": user_id,
+        "role_user": "assistant",
+        "message": reply_text
+    })
 
 
 @router.message(F.content_type == types.ContentType.VOICE)
-async def voice_handler(msg: Message, bot: Bot):
+@extract_info
+async def voice_handler(msg: Message, bot: Bot, chat_id: int, user_id: int, full_name: str, text: str, history: str):
     voice_file = await bot.get_file(msg.voice.file_id)
     voice_bytes = await bot.download_file(voice_file.file_path)
     with open(settings.INPUT_VOICE, "wb") as f:
@@ -65,8 +95,21 @@ async def voice_handler(msg: Message, bot: Bot):
             model="whisper-1",
             file=audio_file
         )
-    reply_text = await generate_text(transcription.text)
-    await msg.answer(f"Ответ AI: {reply_text}")
+    prompt = history + [{"role": "user", "content": transcription.text}] if history else [{"role": "user", "content": transcription.text}]
+    reply_text = await generate_text(prompt)
+    await msg.answer(f"{full_name}, {reply_text}")
+    await MessagesRepository.add({
+        "chat_id": chat_id,
+        "user_id": user_id,
+        "role_user": "user",
+        "message": transcription.text
+    })
+    await MessagesRepository.add({
+        "chat_id": chat_id,
+        "user_id": user_id,
+        "role_user": "assistant",
+        "message": reply_text
+    })
     response = await client.audio.speech.create(
         model="tts-1-hd",
         voice="onyx",
@@ -79,7 +122,8 @@ async def voice_handler(msg: Message, bot: Bot):
 
 
 async def main():
-    bot = Bot(token=settings.TELEGRAM_TOKEN, parse_mode=ParseMode.HTML)
+    await create_table()
+    bot = Bot(token=settings.TELEGRAM_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
     await bot.delete_webhook(drop_pending_updates=True)
