@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import (Column,
+from sqlalchemy import (BIGINT,
+                        Column,
                         delete,
                         func,
                         insert,
@@ -27,8 +28,8 @@ class Base(DeclarativeBase):
 
 class Messages(Base):
     __tablename__ = "messages"
-    user_id = Column(INT, nullable=False, unique=False)
-    chat_id = Column(INT, nullable=False, unique=False)
+    user_id = Column(BIGINT, nullable=False, unique=False)
+    chat_id = Column(BIGINT, nullable=False, unique=False)
     role_user = Column(VARCHAR(32), nullable=False, unique=False)
     message = Column(TEXT, nullable=True, unique=False)
     date_message = Column(TIMESTAMP, nullable=False, unique=False, server_default=func.now())
