@@ -22,7 +22,7 @@ DB_URL = settings.DATABASE_PRIVATE_URL.unicode_string().replace('postgresql', 'p
 
 class Base(DeclarativeBase):
     id = Column(INT, primary_key=True)
-    async_engine = create_async_engine(DB_URL, echo=True)
+    async_engine = create_async_engine(DB_URL)
     session = async_sessionmaker(bind=async_engine)
 
 

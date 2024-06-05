@@ -3,13 +3,11 @@ from pydantic_settings import BaseSettings
 from pydantic import PostgresDsn
 
 
-load_dotenv()
+load_dotenv(override=True )
 
 
 class Settings(BaseSettings):
     DATABASE_PRIVATE_URL: PostgresDsn
-    INPUT_VOICE: str
-    OUTPUT_VOICE: str
     OPENAI_API_KEY: str
     TELEGRAM_TOKEN: str
 

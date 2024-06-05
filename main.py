@@ -1,7 +1,9 @@
 import asyncio
+import os
 import logging
 from openai import AsyncOpenAI
 from functools import wraps
+from ulid import ulid
 
 from aiogram import Bot, Dispatcher, Router, types, F
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -13,6 +15,11 @@ from database import MessagesRepository, create_table
 
 
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY,)
+
+
+async def async_remove(file_path):
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, os.remove, file_path)
 
 
 async def generate_text(prompt) -> str:
@@ -70,11 +77,13 @@ async def message_handler(msg: Message, chat_id: int, user_id: int, full_name: s
 @router.message(F.content_type == types.ContentType.VOICE)
 @extract_info
 async def voice_handler(msg: Message, bot: Bot, chat_id: int, user_id: int, full_name: str, text: str, history: str):
+    INPUT_VOICE = f"input_{ulid()}.ogg"
+
     voice_file = await bot.get_file(msg.voice.file_id)
     voice_bytes = await bot.download_file(voice_file.file_path)
-    with open(settings.INPUT_VOICE, "wb") as f:
+    with open(INPUT_VOICE, "wb") as f:
         f.write(voice_bytes.read())
-    with open(settings.INPUT_VOICE, "rb") as audio_file:
+    with open(INPUT_VOICE, "rb") as audio_file:
         transcription = await client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file
@@ -99,10 +108,21 @@ async def voice_handler(msg: Message, bot: Bot, chat_id: int, user_id: int, full
         voice="onyx",
         input=reply_text
     )
-    with open(settings.OUTPUT_VOICE, "wb") as audio_file:
+    OUTPUT_VOICE = f"output_{ulid()}.ogg"
+
+    with open(OUTPUT_VOICE, "wb") as audio_file:
         audio_file.write(response.read())
-    audio = FSInputFile(settings.OUTPUT_VOICE)
+    audio = FSInputFile(OUTPUT_VOICE)
     await bot.send_audio(msg.chat.id, audio)
+
+    try:
+        await async_remove(INPUT_VOICE)
+    except FileNotFoundError:
+        print(f"Файл {INPUT_VOICE} не найден.")
+    try:
+        await async_remove(OUTPUT_VOICE)
+    except FileNotFoundError:
+        print(f"Файл {OUTPUT_VOICE} не найден.")
 
 
 async def main():
