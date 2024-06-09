@@ -6,7 +6,6 @@ from sqlalchemy import (BIGINT,
                         insert,
                         INT,
                         select,
-                        TEXT,
                         TIMESTAMP,
                         update,
                         VARCHAR,
@@ -26,16 +25,16 @@ class Base(DeclarativeBase):
     session = async_sessionmaker(bind=async_engine)
 
 
-class Messages(Base):
-    __tablename__ = "messages"
+class UserChat(Base):
+    __tablename__ = "user_chat"
     user_id = Column(BIGINT, nullable=False, unique=False)
     chat_id = Column(BIGINT, nullable=False, unique=False)
-    role_user = Column(VARCHAR(32), nullable=False, unique=False)
-    message = Column(TEXT, nullable=True, unique=False)
-    date_message = Column(TIMESTAMP, nullable=False, unique=False, server_default=func.now())
+    assistant_id = Column(VARCHAR(255), nullable=False, unique=False)
+    thread_id = Column(VARCHAR(255), nullable=False, unique=False)
+    date_thread = Column(TIMESTAMP, nullable=False, unique=False, server_default=func.now())
 
     def __str__(self):
-        return f"{self.chat_id} {self.user_id} {self.role_user} {self.message} {self.date_message}"
+        return f"{self.user_id} {self.assistant_id} {self.thread_id} {self.date_thread}"
 
     def __repr__(self) -> str:
         return str(self)
@@ -119,5 +118,5 @@ class SQLAlchemyRepository(AbstractRepository):
             await s.commit()
 
 
-class MessagesRepository(SQLAlchemyRepository):
-    model = Messages
+class UserChatRepository(SQLAlchemyRepository):
+    model = UserChat
